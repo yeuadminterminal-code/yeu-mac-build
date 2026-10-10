@@ -1,0 +1,39 @@
+# Builds the ユー Mac app on GitHub's free Mac servers.
+# Run it: Actions → "Build Mac app" → Run workflow. The .dmg appears under "Artifacts" (kept 7 days).
+name: Build Mac app
+
+on:
+  workflow_dispatch:
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Add the app secret
+        env:
+          YU_APP_SECRET: ${{ secrets.YU_APP_SECRET }}
+        run: |
+          if [ -z "$YU_APP_SECRET" ]; then echo "::error::Add the YU_APP_SECRET repository secret first (Settings → Secrets and variables → Actions)."; exit 1; fi
+          node -e "require('fs').writeFileSync('app-secret.json', JSON.stringify({ secret: process.env.YU_APP_SECRET }))"
+
+      - name: Build
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist:mac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Yeu-Mac
+          path: dist/*.dmg
+          retention-days: 7
+          if-no-files-found: error
